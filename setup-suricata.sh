@@ -16,6 +16,7 @@ sudo iptables -I FORWARD -j NFQUEUE --queue-num 0 || true
 
 # Проверка конфига Suricata
 echo "Проверка конфига Suricata"
+sudo mkdir -p /tmp/suricata-test
 sudo suricata -T -c /etc/suricata/suricata.yaml -l /tmp/suricata-test
 
 # Запуск Suricata
