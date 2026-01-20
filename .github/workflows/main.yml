@@ -1,0 +1,53 @@
+name: Lab
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-lab:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          docker compose version
+          docker version
+
+      - name: Start lab environment
+        run: docker-compose up -d
+
+      - name: Wait for victim HTTP server
+        run: |
+          for i in {1..10}; do
+            if docker exec victim wget -q -O- http://localhost:80 | grep -q "Welcome"; then
+              echo "Victim HTTP server is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Victim did not start in time"
+          exit 1
+
+      - name: Test HTTP from attacker
+        run: |
+          docker exec attacker curl -s http://172.20.0.2 | head -1
+
+      - name: Install Suricata (for config validation)
+        run: sudo apt-get update && sudo apt-get install -y suricata
+
+      - name: Validate Suricata rules
+        run: |
+          suricata -T -c suricata/suricata.yaml -l /tmp/suricata-test
+
+      - name: Show Suricata test log (if failed)
+        if: failure()
+        run: cat /tmp/suricata-test/suricata.log || true
+
+      - name: Shutdown
+        run: docker-compose down
