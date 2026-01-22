@@ -1,38 +1,44 @@
-# suricata/suricata.yaml
 %YAML 1.1
 ---
-
-# Режим NFQ для IPS
-nfq:
-  - queue: 0
-    mode: accept
-
-# Отключаем af-packet для NFQ режима
-af-packet:
-
+runmodes:
+  - runmode: workers
+# NFQUEUE для IPS
+nfqueue:
+  mode: accept
+  repeat-mark: 1
+  repeat-mask: 1
+  bypass-mark: 2
+  bypass-mask: 2
+  queue-balance:
+    - 0-3
+# Правила
+rule-files:
+  - /etc/suricata/rules/local.rules
+# EVE — основной лог
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert
+        - drop
+        - http
+        - dns
+# Отключаем лишнее для простоты
+classification-file: /etc/suricata/classification.config
+reference-config-file: /etc/suricata/reference.config
+app-layer:
+  protocols:
+    http: enabled
+    dns: enabled
+    tls: enabled
+# Логирование
 logging:
   outputs:
+    - console:
+        enabled: no
     - file:
         enabled: yes
-        filename: /var/log/suricata/fast.log
-        format:
-          - "[%i] %t - <%d> (%n) -- "
-          - "%z "
-          - "%C "
-          - "%r"
-    - file:
-        enabled: yes
-        filename: /var/log/suricata/eve.json
-        type: json
-        types:
-          - alert
-          - http
-          - dns
-          - tls
-          - ssh
-          - stats
-          - flow
-
-default-rule-path: /etc/suricata/rules
-rule-files:
-  - local.rules
+        level: info
+        filename: suricata.log

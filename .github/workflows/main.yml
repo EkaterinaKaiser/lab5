@@ -3,113 +3,36 @@ name: Lab
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   deploy-cloud:
-    name: Deploy lab to cloud host
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      HOST: ${{ secrets.CLOUD_USER }}@${{ secrets.CLOUD_HOST }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Start ssh-agent and add key
-        uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.CLOUD_SSH_KEY }}
 
-      - name: Add cloud host to known_hosts
+      - name: Stop containers
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.CLOUD_HOST }}" >> ~/.ssh/known_hosts
+          ssh -o StrictHostKeyChecking=no "$HOST" 'docker compose -f docker-compose.yml down -v --remove-orphans || true'
 
-      - name: Deploy to cloud host
-        env:
-          CLOUD_HOST: ${{ secrets.CLOUD_HOST }}
-          CLOUD_USER: ${{ secrets.CLOUD_USER }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+      - name: Copy files
         run: |
-          set -e
-          REMOTE_DIR="labs"
-          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          scp -o StrictHostKeyChecking=no docker-compose.yml deploy.sh suricata/suricata.yaml test-suricata.sh "$HOST:"
 
-          ssh "${CLOUD_USER}@${CLOUD_HOST}" bash -s << EOF
-          set -e
-          # Установка git, если не установлен
-          if ! command -v git &> /dev/null; then
-            if command -v apt-get &> /dev/null; then
-              sudo apt-get update -qq
-              sudo apt-get install -y -qq git
-            elif command -v yum &> /dev/null; then
-              sudo yum install -y -q git
-            else
-              echo "Не удалось определить пакетный менеджер для установки git"
-              exit 1
-            fi
-          fi
-          
-          # Установка Docker, если не установлен
-          if ! command -v docker &> /dev/null; then
-            echo "Установка Docker..."
-            if command -v apt-get &> /dev/null; then
-              sudo apt-get update -qq
-              sudo apt-get install -y -qq ca-certificates curl
-              sudo install -m 0755 -d /etc/apt/keyrings
-              sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-              sudo chmod a+r /etc/apt/keyrings/docker.asc
-              echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \$(. /etc/os-release && echo "\$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-              sudo apt-get update -qq
-              sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-            elif command -v yum &> /dev/null; then
-              sudo yum install -y -q yum-utils
-              sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-              sudo yum install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-              sudo systemctl enable docker
-              sudo systemctl start docker
-            fi
-          fi
-          
-          # Переходим в домашнюю директорию и используем абсолютный путь
-          cd ~
-          REMOTE_DIR_FULL="\$HOME/$REMOTE_DIR"
-          if [ ! -d "\$REMOTE_DIR_FULL" ]; then
-            git clone "$REPO_URL" "\$REMOTE_DIR_FULL"
-            cd "\$REMOTE_DIR_FULL"
-          else
-            cd "\$REMOTE_DIR_FULL"
-            git fetch origin
-            git reset --hard origin/main
-          fi
-          chmod +x setup-suricata.sh
-          sudo ./setup-suricata.sh
-          docker compose pull || true
-          docker compose up -d
-
-          echo "Ожидание готовности контейнеров..."
+      - name: Run deployment script
+        run: |
+          ssh -o StrictHostKeyChecking=no "$HOST" 'bash deploy.sh'
           sleep 10
-          for i in {1..30}; do
-            if docker exec attacker ping -c 1 -W 1 victim >/dev/null 2>&1 || docker exec attacker curl -s http://victim >/dev/null 2>&1; then
-              echo "Контейнеры готовы"
-              break
-            fi
-            echo "Ожидание... ($i/30)"
-            sleep 2
-          done
 
-          echo "===== Проверка работы Suricata IPS ====="
-          echo "Ping victim из attacker (ожидаем, что ICMP будет блокироваться Suricata)"
-          docker exec attacker ping -c 4 -W 2 victim 2>&1 || echo "Ping заблокирован (ожидаемое поведение)"
+      - name: Start containers
+        run: |
+          ssh -o StrictHostKeyChecking=no "$HOST" 'docker compose -f docker-compose.yml up -d'
 
-          echo ""
-          echo "HTTP-запрос с attacker на victim (ожидаем 200 OK)"
-          docker exec attacker curl -s -o /dev/null -w "HTTP code: %{http_code}\n" http://victim || echo "HTTP запрос не выполнен"
-
-          echo "Последние события Suricata из eve.json"
-          if command -v jq >/dev/null 2>&1; then
-            sudo tail -n 30 /var/log/suricata/eve.json | jq '.'
-          else
-            sudo tail -n 30 /var/log/suricata/eve.json || true
-          fi
-          EOF
+      - name: Test Suricata
+        run: |
+          ssh -o StrictHostKeyChecking=no "$HOST" 'bash test-suricata.sh'
