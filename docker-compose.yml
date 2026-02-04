@@ -34,18 +34,6 @@ services:
         apt-get install -y -qq iputils-ping curl netcat-openbsd nmap wget tcpdump &&
         tail -f /dev/null
       "
-    
-  evebox:
-    image: jasonish/evebox:latest
-    restart: unless-stopped
-    ports:
-      - "5636:5636"
-    command: evebox server -D /var/lib/evebox --sqlite
-    volumes:
-      - evebox_data:/var/lib/evebox
-
-volumes:
-  evebox_data:
 
 networks:
   labnet:

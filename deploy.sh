@@ -79,3 +79,26 @@ systemctl daemon-reload
 systemctl enable suricata
 systemctl restart suricata
 systemctl status suricata --no-pager
+
+sudo apt-get install curl
+curl -fsSL https://evebox.org/files/GPG-KEY-evebox -o /etc/apt/keyrings/evebox.asc
+echo "deb [signed-by=/etc/apt/keyrings/evebox.asc] https://evebox.org/files/debian stable main" | sudo tee /etc/apt/sources.list.d/evebox.list
+sudo apt-get update
+sudo apt-get install evebox
+
+sudo usermod -a -G suricata evebox
+
+# EveBox: читать события напрямую из eve.json (SQLite + файл логов Suricata)
+sudo tee /etc/default/evebox > /dev/null <<'EOEVEBOX'
+EVEBOX_OPTS="--database sqlite /var/log/suricata/eve.json"
+EOEVEBOX
+
+# Права на чтение логов Suricata для пользователя evebox
+sudo chown -R root:suricata /var/log/suricata
+sudo chmod 750 /var/log/suricata
+sudo touch /var/log/suricata/eve.json
+sudo chmod 640 /var/log/suricata/eve.json
+
+sudo systemctl daemon-reload
+sudo systemctl restart evebox
+sudo systemctl enable evebox
