@@ -8,7 +8,7 @@ jobs:
   deploy-cloud:
     runs-on: self-hosted
     env:
-      HOST: ${{ secrets.CLOUD_USER }}@${{ secrets.CLOUD_HOST }}
+      HOST: localhost
     steps:
       - uses: actions/checkout@v4
 
