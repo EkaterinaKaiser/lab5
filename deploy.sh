@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Настройка для неинтерактивной установки пакетов
+export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_PRIORITY=critical
+
+# Предварительные ответы для debconf (iptables-persistent)
+echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | sudo debconf-set-selections
+echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections
+
 # Установка базовых утилит и Docker
 sudo apt-get update -qq
 sudo apt-get install -y docker.io curl jq iptables-persistent libnetfilter-queue1

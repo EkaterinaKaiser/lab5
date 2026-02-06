@@ -43,7 +43,12 @@ jobs:
           docker-compose -f docker-compose.yml down -v --remove-orphans || docker compose -f docker-compose.yml down -v --remove-orphans || true
 
       - name: Run deployment script
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          DEBIAN_PRIORITY: critical
         run: |
+          echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | sudo debconf-set-selections
+          echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections
           bash deploy.sh
           sleep 10
 
