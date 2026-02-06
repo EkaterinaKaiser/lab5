@@ -18,16 +18,29 @@ jobs:
 
       - name: Install docker-compose
         run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.26.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
+          # Проверяем наличие docker compose (встроенная команда)
+          if command -v docker &> /dev/null && docker compose version &> /dev/null 2>&1; then
+            echo "docker compose уже установлен"
+            mkdir -p ~/.local/bin
+            ln -sf $(which docker) ~/.local/bin/docker-compose 2>/dev/null || true
+            export PATH="$HOME/.local/bin:$PATH"
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+          elif [ -f /usr/local/bin/docker-compose ] || [ -f /usr/bin/docker-compose ]; then
+            echo "docker-compose уже установлен"
+          else
+            # Устанавливаем в домашнюю директорию (не требует sudo)
+            echo "Установка docker-compose в ~/.local/bin"
+            mkdir -p ~/.local/bin
+            curl -L "https://github.com/docker/compose/releases/download/v2.26.0/docker-compose-$(uname -s)-$(uname -m)" -o ~/.local/bin/docker-compose
+            chmod +x ~/.local/bin/docker-compose
+            export PATH="$HOME/.local/bin:$PATH"
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+          fi
+          docker-compose --version || docker compose version
 
       - name: Stop containers
         run: |
-          docker-compose -f docker-compose.yml down -v --remove-orphans || true
-
-      - name: Copy files
-        run: |
-          cp docker-compose.yml deploy.sh suricata/suricata.yaml test-suricata.sh setup_blocking_rules.sh ./
+          docker-compose -f docker-compose.yml down -v --remove-orphans || docker compose -f docker-compose.yml down -v --remove-orphans || true
 
       - name: Run deployment script
         run: |
@@ -36,7 +49,7 @@ jobs:
 
       - name: Start containers
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker-compose -f docker-compose.yml up -d || docker compose -f docker-compose.yml up -d
 
       - name: Test Suricata
         run: |
