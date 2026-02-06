@@ -18,30 +18,30 @@ jobs:
 
       - name: Install docker-compose
         run: |
-          ssh -o StrictHostKeyChecking=no "$HOST" 'curl -L "https://github.com/docker/compose/releases/download/v2.26.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose'
-          ssh -o StrictHostKeyChecking=no "$HOST" 'chmod +x /usr/local/bin/docker-compose'
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.26.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
 
       - name: Stop containers
         run: |
-          ssh -o StrictHostKeyChecking=no "$HOST" 'docker-compose -f docker-compose.yml down -v --remove-orphans || true'
+          docker-compose -f docker-compose.yml down -v --remove-orphans || true
 
       - name: Copy files
         run: |
-          scp -o StrictHostKeyChecking=no docker-compose.yml deploy.sh suricata/suricata.yaml test-suricata.sh setup_blocking_rules.sh "$HOST:"
+          cp docker-compose.yml deploy.sh suricata/suricata.yaml test-suricata.sh setup_blocking_rules.sh ./
 
       - name: Run deployment script
         run: |
-          ssh -o StrictHostKeyChecking=no "$HOST" 'bash deploy.sh'
+          bash deploy.sh
           sleep 10
 
       - name: Start containers
         run: |
-          ssh -o StrictHostKeyChecking=no "$HOST" 'docker-compose -f docker-compose.yml up -d'
+          docker-compose -f docker-compose.yml up -d
 
       - name: Test Suricata
         run: |
-          ssh -o StrictHostKeyChecking=no "$HOST" 'bash test-suricata.sh'
+          bash test-suricata.sh
 
       - name: Setup blocking rules
         run: |
-          ssh -o StrictHostKeyChecking=no "$HOST" 'sudo bash setup_blocking_rules.sh'
+          sudo bash setup_blocking_rules.sh
