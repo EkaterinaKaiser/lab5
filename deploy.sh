@@ -6,8 +6,13 @@ export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
 
 # Предварительные ответы для debconf (iptables-persistent)
-echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | sudo debconf-set-selections
-echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections
+# Ждем разблокировки debconf, если он заблокирован
+while sudo fuser /var/cache/debconf/config.dat >/dev/null 2>&1; do
+    echo "Ожидание разблокировки debconf..."
+    sleep 2
+done
+echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | sudo debconf-set-selections 2>/dev/null || true
+echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections 2>/dev/null || true
 
 # Установка базовых утилит и Docker
 sudo apt-get update -qq

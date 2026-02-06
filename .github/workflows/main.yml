@@ -46,9 +46,18 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
           DEBIAN_PRIORITY: critical
+          # Автоматические ответы для iptables-persistent через переменные окружения
+          IPTABLES_PERSISTENT_AUTOSAVE_V4: "false"
+          IPTABLES_PERSISTENT_AUTOSAVE_V6: "false"
         run: |
-          echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | sudo debconf-set-selections
-          echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections
+          # Ждем разблокировки debconf, если он заблокирован
+          while sudo fuser /var/cache/debconf/config.dat >/dev/null 2>&1; do
+            echo "Ожидание разблокировки debconf..."
+            sleep 2
+          done
+          # Устанавливаем ответы для debconf (если не заблокирован)
+          echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | sudo debconf-set-selections 2>/dev/null || true
+          echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections 2>/dev/null || true
           bash deploy.sh
           sleep 10
 
